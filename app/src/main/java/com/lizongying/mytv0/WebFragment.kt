@@ -79,6 +79,20 @@ class WebFragment : Fragment() {
                         tvModel?.setErrInfo("")
                     }
                 }, 800)
+                // 临时诊断（v31）：6 秒后把底部栏相关元素清单打到左上角浮层（手机上看）
+                val gen = generation
+                binding.webView.postDelayed({
+                    if (active && gen == generation) {
+                        binding.webView.evaluateJavascript(DUMP_JS) { value ->
+                            try {
+                                val text = org.json.JSONTokener(value).nextValue().toString()
+                                binding.diagView.text = text
+                                binding.diagView.visibility = View.VISIBLE
+                            } catch (e: Exception) {
+                            }
+                        }
+                    }
+                }, 6000)
             }
 
             override fun onReceivedError(
@@ -326,5 +340,56 @@ class WebFragment : Fragment() {
   },1000);
 })();
 """
+
+        private const val DUMP_JS = """
+        (function(){
+          function desc(el){
+            var s=el.tagName.toLowerCase();
+            if(el.id){ s+='#'+el.id; }
+            var c='';
+            try{ c=(typeof el.className==='string')?el.className:''; }catch(e){}
+            if(c){ s+='.'+c.split(' ').join('.'); }
+            return s;
+          }
+          function info(doc,label){
+            var out=[label];
+            var W=doc.defaultView;
+            if(!W){ return out; }
+            var els=doc.querySelectorAll('*');
+            var cnt=0;
+            for(var i=0;i<els.length&&cnt<30;i++){
+              var el=els[i];
+              try{
+                if(el.tagName==='VIDEO'){ continue; }
+                var r=el.getBoundingClientRect();
+                if(r.height===0||r.width===0){ continue; }
+                var key=((el.id||'')+' '+(typeof el.className==='string'?el.className:'')).toLowerCase();
+                var kw=key.indexOf('control')>=0||key.indexOf('play')>=0||key.indexOf('pause')>=0||key.indexOf('toolbar')>=0||key.indexOf('progress')>=0||key.indexOf('volume')>=0||key.indexOf('xg-')>=0||key.indexOf('vjs')>=0||key.indexOf('dplayer')>=0||key.indexOf('prism')>=0;
+                var bottomZone=r.bottom>W.innerHeight*0.7&&r.height<=W.innerHeight*0.3&&r.width>W.innerWidth*0.3;
+                if(bottomZone||kw){
+                  var cs=W.getComputedStyle(el);
+                  out.push(desc(el)+' | '+Math.round(r.left)+','+Math.round(r.top)+' '+Math.round(r.width)+'x'+Math.round(r.height)+' | '+cs.position+' z'+cs.zIndex);
+                  cnt++;
+                }
+              }catch(e){}
+            }
+            return out;
+          }
+          var lines=[];
+          var vs=document.querySelectorAll('video');
+          for(var i=0;i<vs.length;i++){
+            lines.push('VIDEO controls='+vs[i].controls+' paused='+vs[i].paused);
+            var chain=[]; var n=vs[i];
+            for(var d=0;d<6&&n;d++){ chain.push(desc(n)); n=n.parentElement; }
+            lines.push('chain: '+chain.join(' < '));
+          }
+          lines=lines.concat(info(document,'== main =='));
+          var frs=document.querySelectorAll('iframe');
+          for(var j=0;j<frs.length;j++){
+            try{ var d2=frs[j].contentDocument; if(d2){ lines=lines.concat(info(d2,'== iframe'+j+' ==')); } }catch(e){}
+          }
+          return lines.join('\n');
+        })();
+        """
     }
 }
