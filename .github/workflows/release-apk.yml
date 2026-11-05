@@ -26,9 +26,9 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Upload to release v14-test
+      - name: Upload to release v15-test
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk mytv-v14.apk
-          gh release upload v14-test mytv-v14.apk --clobber
+          cp app/build/outputs/apk/debug/app-debug.apk mytv-v15.apk
+          gh release upload v15-test mytv-v15.apk --clobber

@@ -206,6 +206,8 @@ class WebFragment : Fragment() {
 
     // 菜单/设置等界面打开时先把网页层藏起来：电视上网页视频层会盖住后开的界面，
     // 菜单关掉后主界面再调 softShow 恢复（页面不重载，直播直接续上）。
+    fun isWebActive(): Boolean = active
+
     fun softHide() {
         if (active && _binding != null) {
             binding.root.visibility = View.GONE

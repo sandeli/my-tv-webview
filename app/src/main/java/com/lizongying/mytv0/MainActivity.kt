@@ -856,6 +856,33 @@ class MainActivity : AppCompatActivity() {
         return super.onKeyDown(keyCode, event)
     }
 
+    // 网页频道全屏播放时，视频视图会先一步吃掉确认/左右等按键（拿去开关它
+    // 自己的控制条），按键根本到不了 onKeyDown。这里在分发最前端拦截：
+    // 网页播放中且没有菜单/设置/节目单打开时，先把遥控按键交给 onKey。
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN &&
+            webFragment.isWebActive() &&
+            (!menuFragment.isAdded || menuFragment.isHidden) &&
+            (!settingFragment.isAdded || settingFragment.isHidden) &&
+            (!programFragment.isAdded || programFragment.isHidden)
+        ) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+                KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
+                KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS,
+                KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_CHANNEL_DOWN,
+                KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE,
+                KeyEvent.KEYCODE_BOOKMARK, KeyEvent.KEYCODE_HELP,
+                in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 -> {
+                    onKey(event.keyCode)
+                    return true
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     override fun onResume() {
         super.onResume()
 
