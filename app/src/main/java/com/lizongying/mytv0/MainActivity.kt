@@ -519,6 +519,10 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        if (fragment === menuFragment || fragment === settingFragment || fragment === programFragment) {
+            webFragment.softHide()
+        }
+
         if (!fragment.isAdded) {
             supportFragmentManager.beginTransaction()
                 .add(R.id.main_browse_fragment, fragment)
@@ -547,6 +551,10 @@ class MainActivity : AppCompatActivity() {
         supportFragmentManager.beginTransaction()
             .hide(fragment)
             .commitAllowingStateLoss()
+
+        if (fragment === menuFragment || fragment === settingFragment || fragment === programFragment) {
+            webFragment.softShow()
+        }
     }
 
     fun menuActive() {
@@ -560,6 +568,7 @@ class MainActivity : AppCompatActivity() {
                 supportFragmentManager.beginTransaction()
                     .hide(menuFragment)
                     .commitAllowingStateLoss()
+                webFragment.softShow()
             }
         }
     }
