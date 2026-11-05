@@ -521,8 +521,8 @@ class MainViewModel : ViewModel() {
                     }
                 }
                 for ((title, uris) in tvMap) {
-                    val channelGroup = uris.first();
-                    uris.drop(1);
+                    val channelGroup = uris.first()
+                    val channelUris = uris.drop(1)
                     val tv = TV(
                         -1,
                         "",
@@ -530,7 +530,7 @@ class MainViewModel : ViewModel() {
                         "",
                         "",
                         "",
-                        uris,
+                        channelUris,
                         0,
                         emptyMap(),
                         channelGroup,
