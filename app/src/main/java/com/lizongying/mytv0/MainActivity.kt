@@ -6,6 +6,9 @@ import android.content.res.Configuration
 import android.graphics.Color
 import android.media.AudioManager
 import android.os.Build
+import android.app.Dialog
+import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -13,6 +16,7 @@ import android.util.Log
 import android.view.GestureDetector
 import android.view.Gravity
 import android.view.KeyEvent
+import android.widget.TextView
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
@@ -775,6 +779,15 @@ class MainActivity : AppCompatActivity() {
             }
 
             KeyEvent.KEYCODE_BACK -> {
+                if (probeDialog?.isShowing == true) {
+                    probeDialog?.dismiss()
+                    probeDialog = null
+                    return true
+                }
+                if (probeOverlay != null) {
+                    removeProbeOverlay()
+                    return true
+                }
                 back()
                 return true
             }
@@ -800,6 +813,10 @@ class MainActivity : AppCompatActivity() {
             }
 
             KeyEvent.KEYCODE_MENU -> {
+                if (webFragment.isWebActive()) {
+                    showProbeOverlay()
+                    return true
+                }
                 showSetting()
                 return true
             }
@@ -810,12 +827,22 @@ class MainActivity : AppCompatActivity() {
                     return true
                 }
 
+                if (webFragment.isWebActive()) {
+                    showProbeDialog()
+                    return true
+                }
+
                 showFragment(menuFragment)
             }
 
             KeyEvent.KEYCODE_DPAD_CENTER -> {
                 if (channelFragment.isAdded && channelFragment.isVisible) {
                     channelFragment.playNow()
+                    return true
+                }
+
+                if (webFragment.isWebActive()) {
+                    showProbeDialog()
                     return true
                 }
 
@@ -860,6 +887,71 @@ class MainActivity : AppCompatActivity() {
     // 网页频道全屏播放时，视频视图会先一步吃掉确认/左右等按键（拿去开关它
     // 自己的控制条），按键根本到不了 onKeyDown。这里在分发最前端拦截：
     // 网页播放中且没有菜单/设置/节目单打开时，先把遥控按键交给 onKey。
+    // 临时探针（v26）：验证独立窗口（对话框/悬浮窗）能否画在电视硬件视频层之上。
+    private var probeDialog: Dialog? = null
+    private var probeOverlay: TextView? = null
+
+    private fun showProbeDialog() {
+        if (probeDialog?.isShowing == true) {
+            probeDialog?.dismiss()
+            probeDialog = null
+            return
+        }
+        val tv = TextView(this)
+        tv.text = "对话框探针：看到这块蓝板 = 独立窗口能盖住视频"
+        tv.setTextColor(Color.WHITE)
+        tv.textSize = 26f
+        tv.setBackgroundColor(Color.BLUE)
+        tv.setPadding(60, 60, 60, 60)
+        val d = Dialog(this)
+        d.setContentView(tv)
+        d.setCancelable(false)
+        probeDialog = d
+        d.show()
+    }
+
+    private fun showProbeOverlay() {
+        if (probeOverlay != null) {
+            removeProbeOverlay()
+            return
+        }
+        val wm = getSystemService(WINDOW_SERVICE) as WindowManager
+        val tv = TextView(this)
+        tv.text = "悬浮窗探针：看到这块绿板 = 悬浮窗能盖住视频"
+        tv.setTextColor(Color.WHITE)
+        tv.textSize = 26f
+        tv.setBackgroundColor(Color.rgb(0, 140, 0))
+        tv.setPadding(60, 60, 60, 60)
+        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        else
+            @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_SYSTEM_ALERT
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            type,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            android.graphics.PixelFormat.TRANSLUCENT
+        )
+        params.gravity = Gravity.CENTER
+        try {
+            wm.addView(tv, params)
+            probeOverlay = tv
+        } catch (e: Exception) {
+            "悬浮窗失败:${e.javaClass.simpleName}".showToast()
+        }
+    }
+
+    private fun removeProbeOverlay() {
+        probeOverlay?.let {
+            try {
+                (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it)
+            } catch (e: Exception) {
+            }
+        }
+        probeOverlay = null
+    }
+
     // 临时诊断（v23）：把分发入口与各界面的状态打成 Toast，一次看清卡点。
     private fun fragState(f: Fragment): String =
         if (!f.isAdded) "-" else if (f.isHidden) "藏" else "显"
