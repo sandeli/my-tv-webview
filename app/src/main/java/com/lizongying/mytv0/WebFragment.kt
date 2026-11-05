@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -120,6 +121,7 @@ class WebFragment : Fragment() {
                 }
                 customView = view
                 customViewCallback = callback
+                view.setOnKeyListener { _, keyCode, event -> forwardKey(keyCode, event) }
                 binding.fullscreenContainer.addView(
                     view,
                     ViewGroup.LayoutParams(
@@ -143,6 +145,32 @@ class WebFragment : Fragment() {
                 customViewCallback = null
             }
         }
+        // 遥控器按键转发：网页频道下 WebView 拿到焦点会吞掉确认/方向键，
+        // 菜单调不出来，这里把按键先交回 MainActivity 统一处理（见 forwardKey）。
+        webView.setOnKeyListener { _, keyCode, event -> forwardKey(keyCode, event) }
+    }
+
+    // 把遥控器按键交回 MainActivity.onKey 统一处理：它负责的按键就地消费，
+    // 不负责的（如音量）返回 false 还给 WebView/系统。
+    private fun forwardKey(keyCode: Int, event: KeyEvent): Boolean {
+        if (event.action != KeyEvent.ACTION_DOWN) {
+            return false
+        }
+        return when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS,
+            KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_CHANNEL_DOWN,
+            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE,
+            KeyEvent.KEYCODE_BOOKMARK, KeyEvent.KEYCODE_HELP,
+            in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 -> {
+                (activity as? MainActivity)?.onKey(keyCode)
+                true
+            }
+
+            else -> false
+        }
     }
 
     fun play(tvModel: TVModel) {
@@ -161,12 +189,6 @@ class WebFragment : Fragment() {
         synchronized(failedUrls) { failedUrls.clear() }
         synchronized(consoleLogs) { consoleLogs.clear() }
         binding.webView.loadUrl(url)
-        val gen = generation
-        binding.diagView.visibility = View.VISIBLE
-        binding.diagView.text = "诊断: 页面加载中…"
-        for (delay in listOf(4000L, 9000L, 16000L)) {
-            handler.postDelayed({ if (active && generation == gen) probe(gen) }, delay)
-        }
     }
 
     fun stopPlayback() {
@@ -176,38 +198,9 @@ class WebFragment : Fragment() {
         active = false
         currentUrl = null
         if (_binding != null) {
-            binding.diagView.visibility = View.GONE
-        }
-        if (_binding != null) {
             binding.webView.stopLoading()
             binding.webView.loadUrl("about:blank")
             binding.root.visibility = View.GONE
-        }
-    }
-
-    private fun probe(gen: Int) {
-        if (_binding == null) return
-        binding.webView.evaluateJavascript(PROBE_JS) { raw ->
-            if (!active || generation != gen || _binding == null) return@evaluateJavascript
-            var text = raw ?: "null"
-            if (text.length >= 2 && text.startsWith("\"") && text.endsWith("\"")) {
-                text = text.substring(1, text.length - 1)
-            }
-            text = text.replace("\\n", "\n").replace("\\u003C", "<").replace("\\\"", "\"")
-            val extra = StringBuilder()
-            synchronized(failedUrls) {
-                if (failedUrls.isNotEmpty()) {
-                    extra.append("\n失败请求:")
-                    failedUrls.forEach { extra.append("\n  ").append(it) }
-                }
-            }
-            synchronized(consoleLogs) {
-                if (consoleLogs.isNotEmpty()) {
-                    extra.append("\n控制台:")
-                    consoleLogs.forEach { extra.append("\n  ").append(it) }
-                }
-            }
-            binding.diagView.text = text + extra.toString()
         }
     }
 
@@ -235,34 +228,6 @@ class WebFragment : Fragment() {
 
     companion object {
         private const val TAG = "WebFragment"
-        private const val PROBE_JS = """
-(function(){
-  var out=[];
-  out.push('标题: '+document.title);
-  out.push('地址: '+location.href);
-  var vs=document.querySelectorAll('video');
-  out.push('video数: '+vs.length);
-  for(var i=0;i<vs.length;i++){
-    var v=vs[i];
-    var src=(v.currentSrc||v.src||'(无)');
-    if(src.length>90){ src=src.substring(0,90)+'...'; }
-    out.push(' v'+i+' ready='+v.readyState+' paused='+v.paused+' 尺寸='+v.videoWidth+'x'+v.videoHeight+' err='+(v.error?v.error.code:'-'));
-    out.push('   src='+src);
-  }
-  var frs=document.querySelectorAll('iframe');
-  out.push('iframe数: '+frs.length);
-  for(var j=0;j<frs.length;j++){
-    var fs=frs[j].src||'(无)';
-    if(fs.length>90){ fs=fs.substring(0,90)+'...'; }
-    out.push(' f'+j+' '+fs);
-  }
-  var txt='';
-  try{ txt=(document.body?document.body.innerText:'').replace(/\s+/g,' ').substring(0,140); }catch(e){}
-  out.push('正文: '+txt);
-  return out.join('\n');
-})();
-"""
-
         private const val DESKTOP_UA =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 
