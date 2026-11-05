@@ -112,7 +112,18 @@ class Sources {
         if (!SP.sources.isNullOrEmpty()) {
             try {
                 val sources: List<Source> = gson.fromJson(SP.sources!!, typeSourceList)
-                setSources(sources.map { it.apply { checked = false } })
+                var loaded = sources.map { it.apply { checked = false } }
+                // v36 一次性清理：内置预置源只保留无锡一条（用户要求）。
+                // 仅执行一次（标记存 SP），之后用户手动添加的源不受影响。
+                if (!SP.sourcesPurgedV36) {
+                    SP.sourcesPurgedV36 = true
+                    val wuxiUri =
+                        "https://raw.githubusercontent.com/sandeli/my-tv-webview/master/examples/wuxi-web.txt"
+                    if (loaded.any { it.uri == wuxiUri }) {
+                        loaded = loaded.filter { it.uri == wuxiUri }
+                    }
+                }
+                setSources(loaded)
             } catch (e: Exception) {
                 e.printStackTrace()
                 SP.sources = SP.DEFAULT_SOURCES

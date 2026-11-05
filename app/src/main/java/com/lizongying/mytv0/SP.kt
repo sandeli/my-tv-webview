@@ -57,6 +57,7 @@ object SP {
     private const val KEY_LOG_TIMES = "log_times"
 
     private const val KEY_SOURCES = "sources"
+    private const val KEY_SOURCES_PURGED_V36 = "sources_purged_v36"
 
     private const val KEY_SOFT_DECODE = "soft_decode"
 
@@ -212,6 +213,10 @@ object SP {
     var logTimes: Int
         get() = sp.getInt(KEY_LOG_TIMES, DEFAULT_LOG_TIMES)
         set(value) = sp.edit().putInt(KEY_LOG_TIMES, value).apply()
+
+    var sourcesPurgedV36: Boolean
+        get() = sp.getBoolean(KEY_SOURCES_PURGED_V36, false)
+        set(value) = sp.edit().putBoolean(KEY_SOURCES_PURGED_V36, value).apply()
 
     var sources: String?
         get() = sp.getString(KEY_SOURCES, DEFAULT_SOURCES)
