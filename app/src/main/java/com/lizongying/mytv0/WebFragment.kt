@@ -186,9 +186,10 @@ class WebFragment : Fragment() {
         suspended = false
         generation++
         currentUrl = url
-        if (binding.webView.parent == null) {
-            binding.root.addView(binding.webView, 0)
-        }
+        val lp3 = binding.webView.layoutParams
+        lp3.width = ViewGroup.LayoutParams.MATCH_PARENT
+        lp3.height = ViewGroup.LayoutParams.MATCH_PARENT
+        binding.webView.layoutParams = lp3
         binding.root.visibility = View.VISIBLE
         Log.i(TAG, "play web channel ${tvModel.tv.title} $url")
         tvModel.setErrInfo("")
@@ -225,11 +226,14 @@ class WebFragment : Fragment() {
             _binding == null -> "软藏跳过:无视图".showToast()
             suspended -> "软藏跳过:已挂起".showToast()
             else -> {
-                "软藏执行+摘除".showToast()
+                "软藏执行+缩没".showToast()
                 suspended = true
                 binding.webView.stopLoading()
                 binding.webView.loadUrl("about:blank")
-                (binding.webView.parent as? ViewGroup)?.removeView(binding.webView)
+                val lp = binding.webView.layoutParams
+                lp.width = 1
+                lp.height = 1
+                binding.webView.layoutParams = lp
                 binding.root.visibility = View.GONE
             }
         }
@@ -238,9 +242,10 @@ class WebFragment : Fragment() {
     fun softShow() {
         if (active && _binding != null) {
             "软显执行 挂起=${if (suspended) 1 else 0}".showToast()
-            if (binding.webView.parent == null) {
-                binding.root.addView(binding.webView, 0)
-            }
+            val lp2 = binding.webView.layoutParams
+            lp2.width = ViewGroup.LayoutParams.MATCH_PARENT
+            lp2.height = ViewGroup.LayoutParams.MATCH_PARENT
+            binding.webView.layoutParams = lp2
             binding.root.visibility = View.VISIBLE
             if (suspended) {
                 suspended = false
