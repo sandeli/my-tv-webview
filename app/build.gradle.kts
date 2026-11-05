@@ -10,7 +10,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.lizongying.mytv0"
+        applicationId = "com.sandeli.mytv"
         minSdk = 21
         targetSdk = 35
         versionCode = getVersionCode()
