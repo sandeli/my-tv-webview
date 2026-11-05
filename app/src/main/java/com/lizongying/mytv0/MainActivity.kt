@@ -7,8 +7,6 @@ import android.graphics.Color
 import android.media.AudioManager
 import android.os.Build
 import android.app.Dialog
-import android.graphics.Color
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
