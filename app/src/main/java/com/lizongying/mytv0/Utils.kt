@@ -164,7 +164,7 @@ object Utils {
 
     fun getUrls(url: String): List<String> {
         return if (url.startsWith("https://raw.githubusercontent.com") || url.startsWith("https://github.com")) {
-            listOf(
+            listOf(url) + listOf(
                 "https://gh.llkk.cc/",
                 "https://github.moeyy.xyz/",
                 "https://mirror.ghproxy.com/",
