@@ -209,19 +209,19 @@ class WebFragment : Fragment() {
     fun isWebActive(): Boolean = active
 
     fun softHide() {
-        "软隐藏 active=${if (active) 1 else 0}".showToast()
         if (active && _binding != null) {
             // 光把视图设 GONE 压不住电视的硬件视频层（菜单开了也看不见），
             // 必须让 video 元素本身暂停并 display:none，视频层才会让开。
             binding.webView.evaluateJavascript(HIDE_VIDEO_JS, null)
+            binding.webView.onPause()
             binding.root.visibility = View.GONE
         }
     }
 
     fun softShow() {
-        "软显示".showToast()
         if (active && _binding != null) {
             binding.root.visibility = View.VISIBLE
+            binding.webView.onResume()
             binding.webView.evaluateJavascript(SHOW_VIDEO_JS, null)
         }
     }
@@ -253,10 +253,16 @@ class WebFragment : Fragment() {
         private const val HIDE_VIDEO_JS = """
 (function(){
   function hide(v){ try{ v.pause(); }catch(e){} try{ v.style.setProperty('display','none','important'); }catch(e){} }
-  document.querySelectorAll('video').forEach(hide);
-  document.querySelectorAll('iframe').forEach(function(f){
-    try{ f.contentDocument.querySelectorAll('video').forEach(hide); }catch(e){}
-  });
+  function scan(doc){
+    if(!doc){ return; }
+    var vs=doc.querySelectorAll('video');
+    for(var i=0;i<vs.length;i++){ hide(vs[i]); }
+    var frs=doc.querySelectorAll('iframe');
+    for(var j=0;j<frs.length;j++){
+      try{ scan(frs[j].contentDocument); }catch(e){}
+    }
+  }
+  scan(document);
 })();
 """
 
@@ -270,10 +276,16 @@ class WebFragment : Fragment() {
       if(p&&p.catch){ p.catch(function(){ try{ v.muted=true; v.play(); }catch(e){} }); }
     }catch(e){}
   }
-  document.querySelectorAll('video').forEach(show);
-  document.querySelectorAll('iframe').forEach(function(f){
-    try{ f.contentDocument.querySelectorAll('video').forEach(show); }catch(e){}
-  });
+  function scan(doc){
+    if(!doc){ return; }
+    var vs=doc.querySelectorAll('video');
+    for(var i=0;i<vs.length;i++){ show(vs[i]); }
+    var frs=doc.querySelectorAll('iframe');
+    for(var j=0;j<frs.length;j++){
+      try{ scan(frs[j].contentDocument); }catch(e){}
+    }
+  }
+  scan(document);
 })();
 """
 
