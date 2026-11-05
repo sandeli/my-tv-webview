@@ -115,10 +115,24 @@ class WebFragment : Fragment() {
             }
 
             override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
-                // 不进 HTML5 全屏：全屏视图自带系统暂停/播放底栏（关不掉），
-                // 且脱离页面后注入的全屏样式也管不到它。
-                // 拒绝后播放器留在页内，由注入样式把 video 拉满全屏，效果相同且无底栏。
-                callback?.onCustomViewHidden()
+                if (view == null) {
+                    return
+                }
+                if (customView != null) {
+                    onHideCustomView()
+                }
+                customView = view
+                customViewCallback = callback
+                view.setOnKeyListener { _, keyCode, event -> forwardKey(keyCode, event) }
+                binding.fullscreenContainer.addView(
+                    view,
+                    ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                )
+                binding.fullscreenContainer.visibility = View.VISIBLE
+                binding.webView.visibility = View.GONE
             }
 
             override fun onHideCustomView() {
@@ -297,6 +311,18 @@ class WebFragment : Fragment() {
     sweep(document);
     var vs=document.querySelectorAll('video');
     for(var i=0;i<vs.length;i++){ fit(vs[i]); }
+    if(vs.length===0){
+      var bfs=document.querySelectorAll('iframe');
+      var best=null,barea=0;
+      for(var b=0;b<bfs.length;b++){
+        try{
+          var br=bfs[b].getBoundingClientRect();
+          var ba=br.width*br.height;
+          if(br.height>180&&ba>barea){ barea=ba; best=bfs[b]; }
+        }catch(e){}
+      }
+      if(best){ stretch(best); }
+    }
     var frs=document.querySelectorAll('iframe');
     for(var j=0;j<frs.length;j++){
       try{
