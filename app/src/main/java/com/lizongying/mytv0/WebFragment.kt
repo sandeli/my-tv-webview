@@ -13,6 +13,7 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
+import android.webkit.CookieManager
 import android.webkit.WebViewClient
 import androidx.fragment.app.Fragment
 import com.lizongying.mytv0.databinding.WebBinding
@@ -26,6 +27,8 @@ class WebFragment : Fragment() {
 
     private var tvModel: TVModel? = null
     private var active = false
+    private var generation = 0
+    private var currentUrl: String? = null
 
     private var customView: View? = null
     private var customViewCallback: WebChromeClient.CustomViewCallback? = null
@@ -55,10 +58,12 @@ class WebFragment : Fragment() {
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
             userAgentString = DESKTOP_UA
         }
+        CookieManager.getInstance().setAcceptCookie(true)
+        CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
-                if (!active) {
+                if (!active || url != currentUrl) {
                     return
                 }
                 view?.evaluateJavascript(INJECT_JS, null)
@@ -75,8 +80,10 @@ class WebFragment : Fragment() {
                 request: WebResourceRequest?,
                 error: WebResourceError?
             ) {
+                // 只记日志不报播放错误：切台时旧页面的中断回调、子资源失败都很常见，
+                // 报上去会把错误页盖到正在播的网页上；页面真打不开时 WebView 本身会显示出来。
                 if (active && request?.isForMainFrame == true) {
-                    tvModel?.setErrInfo(R.string.play_error.getString())
+                    Log.w(TAG, "web main frame error ${error?.errorCode} ${request.url}")
                 }
                 super.onReceivedError(view, request, error)
             }
@@ -124,8 +131,11 @@ class WebFragment : Fragment() {
             return
         }
         active = true
+        generation++
+        currentUrl = url
         binding.root.visibility = View.VISIBLE
         Log.i(TAG, "play web channel ${tvModel.tv.title} $url")
+        tvModel.setErrInfo("")
         binding.webView.loadUrl(url)
     }
 
@@ -134,6 +144,7 @@ class WebFragment : Fragment() {
             return
         }
         active = false
+        currentUrl = null
         if (_binding != null) {
             binding.webView.stopLoading()
             binding.webView.loadUrl("about:blank")
@@ -181,6 +192,7 @@ class WebFragment : Fragment() {
         document.head.appendChild(st);
       }
       v.setAttribute('playsinline','');
+      try{ v.click(); }catch(e){}
       var p=v.play();
       if(p&&p.catch){
         p.catch(function(){
@@ -192,6 +204,16 @@ class WebFragment : Fragment() {
   function scan(){
     var vs=document.querySelectorAll('video');
     for(var i=0;i<vs.length;i++){ fit(vs[i]); }
+    var frs=document.querySelectorAll('iframe');
+    for(var j=0;j<frs.length;j++){
+      try{
+        var d=frs[j].contentDocument;
+        if(d){
+          var ivs=d.querySelectorAll('video');
+          for(var k=0;k<ivs.length;k++){ fit(ivs[k]); }
+        }
+      }catch(e){}
+    }
     return vs.length>0;
   }
   if(!scan()){

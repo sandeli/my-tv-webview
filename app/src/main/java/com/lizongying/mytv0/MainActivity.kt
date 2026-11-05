@@ -246,9 +246,16 @@ class MainActivity : AppCompatActivity() {
                     } else {
                         Log.i(TAG, "${tvModel.tv.title} ${tvModel.errInfo.value.toString()}")
                         hideFragment(playerFragment)
-                        webFragment.stopPlayback()
-                        errorFragment.setMsg(tvModel.errInfo.value.toString())
-                        showFragment(errorFragment)
+                        if (tvModel.isWebChannel()) {
+                            // 网页频道的错误不盖错误页、也不关 WebView：
+                            // 让网页本身保持可见（拦截页/播放器界面都能直接看到），
+                            // 且迟到的旧频道错误不会误杀正在播的网页。
+                            hideFragment(errorFragment)
+                        } else {
+                            webFragment.stopPlayback()
+                            errorFragment.setMsg(tvModel.errInfo.value.toString())
+                            showFragment(errorFragment)
+                        }
                     }
                 }
             }
