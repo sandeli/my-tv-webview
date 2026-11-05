@@ -193,7 +193,7 @@ class WebFragment : Fragment() {
             if (text.length >= 2 && text.startsWith("\"") && text.endsWith("\"")) {
                 text = text.substring(1, text.length - 1)
             }
-            text = text.replace("\\n", "\n").replace("\\u003C", "<").replace("\\\", "\")
+            text = text.replace("\\n", "\n").replace("\\u003C", "<").replace("\\\"", "\"")
             val extra = StringBuilder()
             synchronized(failedUrls) {
                 if (failedUrls.isNotEmpty()) {
