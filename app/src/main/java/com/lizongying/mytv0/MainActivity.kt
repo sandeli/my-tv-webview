@@ -2,6 +2,7 @@ package com.lizongying.mytv0
 
 import MainViewModel
 import android.content.Context
+import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Color
 import android.media.AudioManager
@@ -110,6 +111,11 @@ class MainActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_main)
 
+        if (intent.getBooleanExtra(EXTRA_OPEN_SETTINGS, false)) {
+            suppressAutoPlay = true
+            pendingSettings = true
+        }
+
         viewModel = ViewModelProvider(this)[MainViewModel::class.java]
         viewModel.init(this)
 
@@ -183,7 +189,9 @@ class MainActivity : AppCompatActivity() {
                             Log.i(TAG, "當前組 ${it.getName()}")
                             it.setPositionPlaying()
                         }
-                    tvModel?.setReady()
+                    if (!suppressAutoPlay) {
+                        tvModel?.setReady()
+                    }
 
                     val currentGroup = viewModel.groupModel.positionValue
                     if (currentGroup != prevGroup) {
@@ -907,6 +915,10 @@ class MainActivity : AppCompatActivity() {
     private var webMenuSel: Int = -1
     private val webMenuAutoClose = Runnable { closeWebMenu() }
 
+    // 从网页菜单点「打开设置」时重启进来：压住开机自动播放，并自动打开设置。
+    private var suppressAutoPlay = false
+    private var pendingSettings = false
+
     private fun isWebMenuOpen(): Boolean = webMenuDialog?.isShowing == true
 
     private fun buildWebMenuRows(): List<WebMenuRow> {
@@ -1036,9 +1048,17 @@ class MainActivity : AppCompatActivity() {
                 closeWebMenu()
             }
             2 -> {
+                // 冻帧赖在硬件视频层上不走，原地打开设置会被它盖住；
+                // 重启 Activity 换新窗口（视频层随旧窗口销毁），
+                // 并压住开机自动播放、自动打开设置。
                 closeWebMenu()
-                webFragment.stopPlayback()
-                showSetting()
+                val restart = Intent(this, MainActivity::class.java)
+                restart.putExtra(EXTRA_OPEN_SETTINGS, true)
+                restart.addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                )
+                startActivity(restart)
+                finish()
             }
         }
     }
@@ -1091,6 +1111,11 @@ class MainActivity : AppCompatActivity() {
         isSafeToPerformFragmentTransactions = true
 
         showTimeFragment()
+
+        if (pendingSettings) {
+            pendingSettings = false
+            showSetting()
+        }
     }
 
     override fun onPause() {
@@ -1125,5 +1150,6 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "MainActivity"
+        private const val EXTRA_OPEN_SETTINGS = "open_settings"
     }
 }
