@@ -813,6 +813,8 @@ class MainActivity : AppCompatActivity() {
             }
 
             KeyEvent.KEYCODE_DPAD_CENTER -> {
+                // 临时诊断（v20）：确认 OK 走了哪个分支、菜单当时的状态。
+                "OK分支 cf可见=${if (channelFragment.isAdded && channelFragment.isVisible) 1 else 0} menu加=${if (menuFragment.isAdded) 1 else 0} menu藏=${if (menuFragment.isAdded && menuFragment.isHidden) 1 else 0}".showToast()
                 if (channelFragment.isAdded && channelFragment.isVisible) {
                     channelFragment.playNow()
                     return true

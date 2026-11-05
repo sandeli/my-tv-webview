@@ -209,6 +209,7 @@ class WebFragment : Fragment() {
     fun isWebActive(): Boolean = active
 
     fun softHide() {
+        "软隐藏 active=${if (active) 1 else 0}".showToast()
         if (active && _binding != null) {
             // 光把视图设 GONE 压不住电视的硬件视频层（菜单开了也看不见），
             // 必须让 video 元素本身暂停并 display:none，视频层才会让开。
@@ -218,6 +219,7 @@ class WebFragment : Fragment() {
     }
 
     fun softShow() {
+        "软显示".showToast()
         if (active && _binding != null) {
             binding.root.visibility = View.VISIBLE
             binding.webView.evaluateJavascript(SHOW_VIDEO_JS, null)
