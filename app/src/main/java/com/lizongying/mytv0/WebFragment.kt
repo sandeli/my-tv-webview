@@ -255,7 +255,20 @@ class WebFragment : Fragment() {
         // 播放器晚加载的情况用 MutationObserver + 定时重扫兜底。
         private const val INJECT_JS = """
 (function(){
+  function stretch(v){
+    try{
+      v.style.setProperty('position','fixed','important');
+      v.style.setProperty('left','0','important');
+      v.style.setProperty('top','0','important');
+      v.style.setProperty('width','100%','important');
+      v.style.setProperty('height','100%','important');
+      v.style.setProperty('z-index','2147483647','important');
+      v.style.setProperty('object-fit','contain','important');
+      v.style.setProperty('background','#000','important');
+    }catch(e){}
+  }
   function fit(v){
+    stretch(v);
     try{
       if(!document.getElementById('__webtv_style')){
         var st=document.createElement('style');
@@ -305,6 +318,7 @@ class WebFragment : Fragment() {
         if(d){
           sweep(d);
           var ivs=d.querySelectorAll('video');
+          if(ivs.length>0){ stretch(frs[j]); }
           for(var k=0;k<ivs.length;k++){ fit(ivs[k]); }
         }
       }catch(e){}
@@ -314,15 +328,26 @@ class WebFragment : Fragment() {
   if(!scan()){
     var mo=new MutationObserver(function(){ scan(); });
     mo.observe(document.documentElement,{childList:true,subtree:true});
-    setTimeout(function(){ mo.disconnect(); },20000);
+    setTimeout(function(){ mo.disconnect(); },90000);
   }
   var n=0;
   var timer=setInterval(function(){
     n++;
     sweep(document);
     var vs=document.querySelectorAll('video');
-    for(var i=0;i<vs.length;i++){ if(vs[i].paused){ fit(vs[i]); } }
-    if(n>=10){ clearInterval(timer); }
+    for(var i=0;i<vs.length;i++){ if(vs[i].paused){ fit(vs[i]); }else{ stretch(vs[i]); } }
+    var frs2=document.querySelectorAll('iframe');
+    for(var j=0;j<frs2.length;j++){
+      try{
+        var d2=frs2[j].contentDocument;
+        if(d2){
+          var ivs2=d2.querySelectorAll('video');
+          if(ivs2.length>0){ stretch(frs2[j]); }
+          for(var k=0;k<ivs2.length;k++){ if(ivs2[k].paused){ fit(ivs2[k]); }else{ stretch(ivs2[k]); } }
+        }
+      }catch(e){}
+    }
+    if(n>=120){ clearInterval(timer); }
   },1000);
 })();
 """
