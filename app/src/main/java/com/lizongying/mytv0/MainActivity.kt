@@ -860,11 +860,6 @@ class MainActivity : AppCompatActivity() {
     // 自己的控制条），按键根本到不了 onKeyDown。这里在分发最前端拦截：
     // 网页播放中且没有菜单/设置/节目单打开时，先把遥控按键交给 onKey。
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        // 临时诊断（v18）：Toast 带上事务安全标志，确认全屏播放时
-        // Activity 是否被暂停（标志为 0 时 showFragment 会被静默拒绝）。
-        if (event.action == KeyEvent.ACTION_DOWN && webFragment.isWebActive()) {
-            "按键 ${event.keyCode} 安全${if (isSafeToPerformFragmentTransactions) 1 else 0}".showToast()
-        }
         if (event.action == KeyEvent.ACTION_DOWN &&
             webFragment.isWebActive() &&
             (!menuFragment.isAdded || menuFragment.isHidden) &&

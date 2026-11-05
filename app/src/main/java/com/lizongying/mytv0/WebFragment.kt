@@ -210,6 +210,9 @@ class WebFragment : Fragment() {
 
     fun softHide() {
         if (active && _binding != null) {
+            // 光把视图设 GONE 压不住电视的硬件视频层（菜单开了也看不见），
+            // 必须让 video 元素本身暂停并 display:none，视频层才会让开。
+            binding.webView.evaluateJavascript(HIDE_VIDEO_JS, null)
             binding.root.visibility = View.GONE
         }
     }
@@ -217,6 +220,7 @@ class WebFragment : Fragment() {
     fun softShow() {
         if (active && _binding != null) {
             binding.root.visibility = View.VISIBLE
+            binding.webView.evaluateJavascript(SHOW_VIDEO_JS, null)
         }
     }
 
@@ -244,6 +248,33 @@ class WebFragment : Fragment() {
 
     companion object {
         private const val TAG = "WebFragment"
+        private const val HIDE_VIDEO_JS = """
+(function(){
+  function hide(v){ try{ v.pause(); }catch(e){} try{ v.style.setProperty('display','none','important'); }catch(e){} }
+  document.querySelectorAll('video').forEach(hide);
+  document.querySelectorAll('iframe').forEach(function(f){
+    try{ f.contentDocument.querySelectorAll('video').forEach(hide); }catch(e){}
+  });
+})();
+"""
+
+        private const val SHOW_VIDEO_JS = """
+(function(){
+  function show(v){
+    try{ v.style.removeProperty('display'); }catch(e){}
+    try{ v.click(); }catch(e){}
+    try{
+      var p=v.play();
+      if(p&&p.catch){ p.catch(function(){ try{ v.muted=true; v.play(); }catch(e){} }); }
+    }catch(e){}
+  }
+  document.querySelectorAll('video').forEach(show);
+  document.querySelectorAll('iframe').forEach(function(f){
+    try{ f.contentDocument.querySelectorAll('video').forEach(show); }catch(e){}
+  });
+})();
+"""
+
         private const val DESKTOP_UA =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 
