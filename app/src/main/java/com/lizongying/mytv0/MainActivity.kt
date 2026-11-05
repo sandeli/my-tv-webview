@@ -679,6 +679,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showSetting() {
+        "设置入口 节${fragState(programFragment)} 菜${fragState(menuFragment)}".showToast()
         if (programFragment.isAdded && !programFragment.isHidden) {
             return
         }
@@ -859,7 +860,14 @@ class MainActivity : AppCompatActivity() {
     // 网页频道全屏播放时，视频视图会先一步吃掉确认/左右等按键（拿去开关它
     // 自己的控制条），按键根本到不了 onKeyDown。这里在分发最前端拦截：
     // 网页播放中且没有菜单/设置/节目单打开时，先把遥控按键交给 onKey。
+    // 临时诊断（v23）：把分发入口与各界面的状态打成 Toast，一次看清卡点。
+    private fun fragState(f: Fragment): String =
+        if (!f.isAdded) "-" else if (f.isHidden) "藏" else "显"
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN && webFragment.isWebActive()) {
+            "分发 ${event.keyCode} 菜${fragState(menuFragment)} 设${fragState(settingFragment)} 节${fragState(programFragment)}".showToast()
+        }
         if (event.action == KeyEvent.ACTION_DOWN &&
             webFragment.isWebActive() &&
             (!menuFragment.isAdded || menuFragment.isHidden) &&

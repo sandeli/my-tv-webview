@@ -217,16 +217,23 @@ class WebFragment : Fragment() {
     // 唯一可靠的让开办法是把页面导航走——文档销毁，视频层必然释放；
     // 菜单关掉时重新加载当前频道（直播流，几秒回到画面）。
     fun softHide() {
-        if (active && _binding != null && !suspended) {
-            suspended = true
-            binding.webView.stopLoading()
-            binding.webView.loadUrl("about:blank")
-            binding.root.visibility = View.GONE
+        when {
+            !active -> "软藏跳过:未激活".showToast()
+            _binding == null -> "软藏跳过:无视图".showToast()
+            suspended -> "软藏跳过:已挂起".showToast()
+            else -> {
+                "软藏执行".showToast()
+                suspended = true
+                binding.webView.stopLoading()
+                binding.webView.loadUrl("about:blank")
+                binding.root.visibility = View.GONE
+            }
         }
     }
 
     fun softShow() {
         if (active && _binding != null) {
+            "软显执行 挂起=${if (suspended) 1 else 0}".showToast()
             binding.root.visibility = View.VISIBLE
             if (suspended) {
                 suspended = false
@@ -235,6 +242,8 @@ class WebFragment : Fragment() {
                     binding.webView.loadUrl(url)
                 }
             }
+        } else {
+            "软显跳过".showToast()
         }
     }
 
