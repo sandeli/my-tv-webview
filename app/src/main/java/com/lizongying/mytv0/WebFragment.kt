@@ -32,6 +32,8 @@ class WebFragment : Fragment() {
     private var generation = 0
     private var currentUrl: String? = null
 
+    private var suspended = false
+
     private var customView: View? = null
     private var customViewCallback: WebChromeClient.CustomViewCallback? = null
 
@@ -181,6 +183,7 @@ class WebFragment : Fragment() {
             return
         }
         active = true
+        suspended = false
         generation++
         currentUrl = url
         binding.root.visibility = View.VISIBLE
@@ -196,6 +199,7 @@ class WebFragment : Fragment() {
             return
         }
         active = false
+        suspended = false
         currentUrl = null
         if (_binding != null) {
             binding.webView.stopLoading()
@@ -208,12 +212,15 @@ class WebFragment : Fragment() {
     // 菜单关掉后主界面再调 softShow 恢复（页面不重载，直播直接续上）。
     fun isWebActive(): Boolean = active
 
+    // 菜单/设置打开时：这台电视的硬件视频层压得住一切视图级隐藏
+    // （视图 GONE、脚本暂停+display:none 都试过，画面仍盖住菜单），
+    // 唯一可靠的让开办法是把页面导航走——文档销毁，视频层必然释放；
+    // 菜单关掉时重新加载当前频道（直播流，几秒回到画面）。
     fun softHide() {
-        if (active && _binding != null) {
-            // 光把视图设 GONE 压不住电视的硬件视频层（菜单开了也看不见），
-            // 必须让 video 元素本身暂停并 display:none，视频层才会让开。
-            binding.webView.evaluateJavascript(HIDE_VIDEO_JS, null)
-            binding.webView.onPause()
+        if (active && _binding != null && !suspended) {
+            suspended = true
+            binding.webView.stopLoading()
+            binding.webView.loadUrl("about:blank")
             binding.root.visibility = View.GONE
         }
     }
@@ -221,8 +228,13 @@ class WebFragment : Fragment() {
     fun softShow() {
         if (active && _binding != null) {
             binding.root.visibility = View.VISIBLE
-            binding.webView.onResume()
-            binding.webView.evaluateJavascript(SHOW_VIDEO_JS, null)
+            if (suspended) {
+                suspended = false
+                val url = currentUrl
+                if (!url.isNullOrEmpty()) {
+                    binding.webView.loadUrl(url)
+                }
+            }
         }
     }
 
@@ -250,45 +262,6 @@ class WebFragment : Fragment() {
 
     companion object {
         private const val TAG = "WebFragment"
-        private const val HIDE_VIDEO_JS = """
-(function(){
-  function hide(v){ try{ v.pause(); }catch(e){} try{ v.style.setProperty('display','none','important'); }catch(e){} }
-  function scan(doc){
-    if(!doc){ return; }
-    var vs=doc.querySelectorAll('video');
-    for(var i=0;i<vs.length;i++){ hide(vs[i]); }
-    var frs=doc.querySelectorAll('iframe');
-    for(var j=0;j<frs.length;j++){
-      try{ scan(frs[j].contentDocument); }catch(e){}
-    }
-  }
-  scan(document);
-})();
-"""
-
-        private const val SHOW_VIDEO_JS = """
-(function(){
-  function show(v){
-    try{ v.style.removeProperty('display'); }catch(e){}
-    try{ v.click(); }catch(e){}
-    try{
-      var p=v.play();
-      if(p&&p.catch){ p.catch(function(){ try{ v.muted=true; v.play(); }catch(e){} }); }
-    }catch(e){}
-  }
-  function scan(doc){
-    if(!doc){ return; }
-    var vs=doc.querySelectorAll('video');
-    for(var i=0;i<vs.length;i++){ show(vs[i]); }
-    var frs=doc.querySelectorAll('iframe');
-    for(var j=0;j<frs.length;j++){
-      try{ scan(frs[j].contentDocument); }catch(e){}
-    }
-  }
-  scan(document);
-})();
-"""
-
         private const val DESKTOP_UA =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 
