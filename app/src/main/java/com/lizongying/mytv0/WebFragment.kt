@@ -186,6 +186,9 @@ class WebFragment : Fragment() {
         suspended = false
         generation++
         currentUrl = url
+        if (binding.webView.parent == null) {
+            binding.root.addView(binding.webView, 0)
+        }
         binding.root.visibility = View.VISIBLE
         Log.i(TAG, "play web channel ${tvModel.tv.title} $url")
         tvModel.setErrInfo("")
@@ -222,10 +225,11 @@ class WebFragment : Fragment() {
             _binding == null -> "软藏跳过:无视图".showToast()
             suspended -> "软藏跳过:已挂起".showToast()
             else -> {
-                "软藏执行".showToast()
+                "软藏执行+摘除".showToast()
                 suspended = true
                 binding.webView.stopLoading()
                 binding.webView.loadUrl("about:blank")
+                (binding.webView.parent as? ViewGroup)?.removeView(binding.webView)
                 binding.root.visibility = View.GONE
             }
         }
@@ -234,6 +238,9 @@ class WebFragment : Fragment() {
     fun softShow() {
         if (active && _binding != null) {
             "软显执行 挂起=${if (suspended) 1 else 0}".showToast()
+            if (binding.webView.parent == null) {
+                binding.root.addView(binding.webView, 0)
+            }
             binding.root.visibility = View.VISIBLE
             if (suspended) {
                 suspended = false
