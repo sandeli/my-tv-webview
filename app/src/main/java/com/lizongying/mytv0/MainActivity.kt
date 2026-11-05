@@ -33,6 +33,7 @@ class MainActivity : AppCompatActivity() {
 
     private var ok = 0
     private var playerFragment = PlayerFragment()
+    private var webFragment = WebFragment()
     private val errorFragment = ErrorFragment()
     private val loadingFragment = LoadingFragment()
     private var infoFragment = InfoFragment()
@@ -110,6 +111,7 @@ class MainActivity : AppCompatActivity() {
         if (savedInstanceState == null) {
             supportFragmentManager.beginTransaction()
                 .add(R.id.main_browse_fragment, playerFragment)
+                .add(R.id.main_browse_fragment, webFragment)
                 .add(R.id.main_browse_fragment, infoFragment)
                 .add(R.id.main_browse_fragment, channelFragment)
                 .commitNowAllowingStateLoss()
@@ -236,10 +238,15 @@ class MainActivity : AppCompatActivity() {
                     if (tvModel.errInfo.value == "") {
                         Log.i(TAG, "${tvModel.tv.title} playing")
                         hideFragment(errorFragment)
-                        showFragment(playerFragment)
+                        if (tvModel.isWebChannel()) {
+                            hideFragment(playerFragment)
+                        } else {
+                            showFragment(playerFragment)
+                        }
                     } else {
                         Log.i(TAG, "${tvModel.tv.title} ${tvModel.errInfo.value.toString()}")
                         hideFragment(playerFragment)
+                        webFragment.stopPlayback()
                         errorFragment.setMsg(tvModel.errInfo.value.toString())
                         showFragment(errorFragment)
                     }
@@ -255,7 +262,14 @@ class MainActivity : AppCompatActivity() {
                     Log.i(TAG, "${tvModel.tv.title} 嘗試播放")
                     hideFragment(errorFragment)
                     showFragment(loadingFragment)
-                    playerFragment.play(tvModel)
+                    if (tvModel.isWebChannel()) {
+                        playerFragment.stopPlayback()
+                        hideFragment(playerFragment)
+                        webFragment.play(tvModel)
+                    } else {
+                        webFragment.stopPlayback()
+                        playerFragment.play(tvModel)
+                    }
                     infoFragment.show(tvModel)
                     if (SP.channelNum) {
                         channelFragment.show(tvModel)

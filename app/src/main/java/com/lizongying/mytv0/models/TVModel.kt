@@ -80,6 +80,16 @@ class TVModel(var tv: TV) : ViewModel() {
         return tv.uris[videoIndexValue]
     }
 
+    // 网页频道：源地址以 web: 开头，如 web:https://example.com/live
+    fun isWebChannel(): Boolean {
+        return getVideoUrl()?.startsWith(WEB_PREFIX) == true
+    }
+
+    fun getWebUrl(): String? {
+        val url = getVideoUrl() ?: return null
+        return if (url.startsWith(WEB_PREFIX)) url.substring(WEB_PREFIX.length) else null
+    }
+
     private val _like = MutableLiveData<Boolean>()
     val like: LiveData<Boolean>
         get() = _like
@@ -240,5 +250,6 @@ class TVModel(var tv: TV) : ViewModel() {
 
     companion object {
         private const val TAG = "TVModel"
+        const val WEB_PREFIX = "web:"
     }
 }

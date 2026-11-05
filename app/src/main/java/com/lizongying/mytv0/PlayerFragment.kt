@@ -220,6 +220,11 @@ class PlayerFragment : Fragment() {
         }
     }
 
+    fun stopPlayback() {
+        player?.stop()
+        player?.clearMediaItems()
+    }
+
     fun showVolume(visibility: Int) {
         binding.icon.visibility = visibility
         binding.volume.visibility = visibility
