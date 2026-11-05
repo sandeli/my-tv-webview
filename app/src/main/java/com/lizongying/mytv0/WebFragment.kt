@@ -13,6 +13,7 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
+import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
 import android.webkit.WebViewClient
 import androidx.fragment.app.Fragment
@@ -34,6 +35,8 @@ class WebFragment : Fragment() {
     private var customViewCallback: WebChromeClient.CustomViewCallback? = null
 
     private val handler = Handler(Looper.getMainLooper())
+    private val failedUrls = mutableListOf<String>()
+    private val consoleLogs = mutableListOf<String>()
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -85,10 +88,29 @@ class WebFragment : Fragment() {
                 if (active && request?.isForMainFrame == true) {
                     Log.w(TAG, "web main frame error ${error?.errorCode} ${request.url}")
                 }
+                if (active && request?.isForMainFrame == false) {
+                    val u = request.url?.toString() ?: ""
+                    if (u.contains("thmz") || u.contains("m3u8") || u.contains(".ts")) {
+                        synchronized(failedUrls) {
+                            failedUrls.add(u.take(110))
+                            if (failedUrls.size > 5) failedUrls.removeAt(0)
+                        }
+                    }
+                }
                 super.onReceivedError(view, request, error)
             }
         }
         webView.webChromeClient = object : WebChromeClient() {
+            override fun onConsoleMessage(cm: ConsoleMessage?): Boolean {
+                if (cm != null) {
+                    synchronized(consoleLogs) {
+                        consoleLogs.add(cm.messageLevel().name() + ": " + cm.message().take(90))
+                        if (consoleLogs.size > 5) consoleLogs.removeAt(0)
+                    }
+                }
+                return true
+            }
+
             override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
                 if (view == null) {
                     return
@@ -136,7 +158,15 @@ class WebFragment : Fragment() {
         binding.root.visibility = View.VISIBLE
         Log.i(TAG, "play web channel ${tvModel.tv.title} $url")
         tvModel.setErrInfo("")
+        synchronized(failedUrls) { failedUrls.clear() }
+        synchronized(consoleLogs) { consoleLogs.clear() }
         binding.webView.loadUrl(url)
+        val gen = generation
+        binding.diagView.visibility = View.VISIBLE
+        binding.diagView.text = "诊断: 页面加载中…"
+        for (delay in listOf(4000L, 9000L, 16000L)) {
+            handler.postDelayed({ if (active && generation == gen) probe(gen) }, delay)
+        }
     }
 
     fun stopPlayback() {
@@ -146,9 +176,38 @@ class WebFragment : Fragment() {
         active = false
         currentUrl = null
         if (_binding != null) {
+            binding.diagView.visibility = View.GONE
+        }
+        if (_binding != null) {
             binding.webView.stopLoading()
             binding.webView.loadUrl("about:blank")
             binding.root.visibility = View.GONE
+        }
+    }
+
+    private fun probe(gen: Int) {
+        if (_binding == null) return
+        binding.webView.evaluateJavascript(PROBE_JS) { raw ->
+            if (!active || generation != gen || _binding == null) return@evaluateJavascript
+            var text = raw ?: "null"
+            if (text.length >= 2 && text.startsWith("\"") && text.endsWith("\"")) {
+                text = text.substring(1, text.length - 1)
+            }
+            text = text.replace("\\n", "\n").replace("\\u003C", "<").replace("\\"", "\"")
+            val extra = StringBuilder()
+            synchronized(failedUrls) {
+                if (failedUrls.isNotEmpty()) {
+                    extra.append("\n失败请求:")
+                    failedUrls.forEach { extra.append("\n  ").append(it) }
+                }
+            }
+            synchronized(consoleLogs) {
+                if (consoleLogs.isNotEmpty()) {
+                    extra.append("\n控制台:")
+                    consoleLogs.forEach { extra.append("\n  ").append(it) }
+                }
+            }
+            binding.diagView.text = text + extra.toString()
         }
     }
 
@@ -176,6 +235,34 @@ class WebFragment : Fragment() {
 
     companion object {
         private const val TAG = "WebFragment"
+        private const val PROBE_JS = """
+(function(){
+  var out=[];
+  out.push('标题: '+document.title);
+  out.push('地址: '+location.href);
+  var vs=document.querySelectorAll('video');
+  out.push('video数: '+vs.length);
+  for(var i=0;i<vs.length;i++){
+    var v=vs[i];
+    var src=(v.currentSrc||v.src||'(无)');
+    if(src.length>90){ src=src.substring(0,90)+'...'; }
+    out.push(' v'+i+' ready='+v.readyState+' paused='+v.paused+' 尺寸='+v.videoWidth+'x'+v.videoHeight+' err='+(v.error?v.error.code:'-'));
+    out.push('   src='+src);
+  }
+  var frs=document.querySelectorAll('iframe');
+  out.push('iframe数: '+frs.length);
+  for(var j=0;j<frs.length;j++){
+    var fs=frs[j].src||'(无)';
+    if(fs.length>90){ fs=fs.substring(0,90)+'...'; }
+    out.push(' f'+j+' '+fs);
+  }
+  var txt='';
+  try{ txt=(document.body?document.body.innerText:'').replace(/\s+/g,' ').substring(0,140); }catch(e){}
+  out.push('正文: '+txt);
+  return out.join('\n');
+})();
+"""
+
         private const val DESKTOP_UA =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 
