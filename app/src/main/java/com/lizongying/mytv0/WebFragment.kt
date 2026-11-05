@@ -186,10 +186,6 @@ class WebFragment : Fragment() {
         suspended = false
         generation++
         currentUrl = url
-        val lp3 = binding.webView.layoutParams
-        lp3.width = ViewGroup.LayoutParams.MATCH_PARENT
-        lp3.height = ViewGroup.LayoutParams.MATCH_PARENT
-        binding.webView.layoutParams = lp3
         binding.root.visibility = View.VISIBLE
         Log.i(TAG, "play web channel ${tvModel.tv.title} $url")
         tvModel.setErrInfo("")
@@ -221,31 +217,16 @@ class WebFragment : Fragment() {
     // 唯一可靠的让开办法是把页面导航走——文档销毁，视频层必然释放；
     // 菜单关掉时重新加载当前频道（直播流，几秒回到画面）。
     fun softHide() {
-        when {
-            !active -> "软藏跳过:未激活".showToast()
-            _binding == null -> "软藏跳过:无视图".showToast()
-            suspended -> "软藏跳过:已挂起".showToast()
-            else -> {
-                "软藏执行+缩没".showToast()
-                suspended = true
-                binding.webView.stopLoading()
-                binding.webView.loadUrl("about:blank")
-                val lp = binding.webView.layoutParams
-                lp.width = 1
-                lp.height = 1
-                binding.webView.layoutParams = lp
-                binding.root.visibility = View.GONE
-            }
+        if (active && _binding != null && !suspended) {
+            suspended = true
+            binding.webView.stopLoading()
+            binding.webView.loadUrl("about:blank")
+            binding.root.visibility = View.GONE
         }
     }
 
     fun softShow() {
         if (active && _binding != null) {
-            "软显执行 挂起=${if (suspended) 1 else 0}".showToast()
-            val lp2 = binding.webView.layoutParams
-            lp2.width = ViewGroup.LayoutParams.MATCH_PARENT
-            lp2.height = ViewGroup.LayoutParams.MATCH_PARENT
-            binding.webView.layoutParams = lp2
             binding.root.visibility = View.VISIBLE
             if (suspended) {
                 suspended = false
@@ -254,22 +235,6 @@ class WebFragment : Fragment() {
                     binding.webView.loadUrl(url)
                 }
             }
-        } else {
-            "软显跳过".showToast()
-        }
-    }
-
-    override fun onPause() {
-        super.onPause()
-        if (_binding != null) {
-            binding.webView.onPause()
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        if (_binding != null) {
-            binding.webView.onResume()
         }
     }
 

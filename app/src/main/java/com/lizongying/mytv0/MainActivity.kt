@@ -14,6 +14,9 @@ import android.util.Log
 import android.view.GestureDetector
 import android.view.Gravity
 import android.view.KeyEvent
+import android.widget.ListView
+import android.widget.BaseAdapter
+import android.view.ViewGroup
 import android.widget.TextView
 import android.view.MotionEvent
 import android.view.View
@@ -681,7 +684,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showSetting() {
-        "设置入口 节${fragState(programFragment)} 菜${fragState(menuFragment)}".showToast()
         if (programFragment.isAdded && !programFragment.isHidden) {
             return
         }
@@ -755,6 +757,9 @@ class MainActivity : AppCompatActivity() {
 
     fun onKey(keyCode: Int): Boolean {
         Log.d(TAG, "keyCode $keyCode")
+        if (isWebMenuOpen()) {
+            return onWebMenuKey(keyCode)
+        }
         when (keyCode) {
             KeyEvent.KEYCODE_0,
             KeyEvent.KEYCODE_1,
@@ -777,15 +782,6 @@ class MainActivity : AppCompatActivity() {
             }
 
             KeyEvent.KEYCODE_BACK -> {
-                if (probeDialog?.isShowing == true) {
-                    probeDialog?.dismiss()
-                    probeDialog = null
-                    return true
-                }
-                if (probeOverlay != null) {
-                    removeProbeOverlay()
-                    return true
-                }
                 back()
                 return true
             }
@@ -812,7 +808,7 @@ class MainActivity : AppCompatActivity() {
 
             KeyEvent.KEYCODE_MENU -> {
                 if (webFragment.isWebActive()) {
-                    showProbeOverlay()
+                    showWebMenu()
                     return true
                 }
                 showSetting()
@@ -826,7 +822,7 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 if (webFragment.isWebActive()) {
-                    showProbeDialog()
+                    showWebMenu()
                     return true
                 }
 
@@ -840,7 +836,7 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 if (webFragment.isWebActive()) {
-                    showProbeDialog()
+                    showWebMenu()
                     return true
                 }
 
@@ -864,10 +860,18 @@ class MainActivity : AppCompatActivity() {
             }
 
             KeyEvent.KEYCODE_DPAD_LEFT -> {
+                if (webFragment.isWebActive()) {
+                    showWebMenu()
+                    return true
+                }
                 showProgram()
             }
 
             KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                if (webFragment.isWebActive()) {
+                    showWebMenu()
+                    return true
+                }
                 showSetting()
             }
         }
@@ -885,79 +889,179 @@ class MainActivity : AppCompatActivity() {
     // 网页频道全屏播放时，视频视图会先一步吃掉确认/左右等按键（拿去开关它
     // 自己的控制条），按键根本到不了 onKeyDown。这里在分发最前端拦截：
     // 网页播放中且没有菜单/设置/节目单打开时，先把遥控按键交给 onKey。
-    // 临时探针（v26）：验证独立窗口（对话框/悬浮窗）能否画在电视硬件视频层之上。
-    private var probeDialog: Dialog? = null
-    private var probeOverlay: TextView? = null
+    // ===== 网页频道专用悬浮菜单 =====
+    // 微鲸电视的硬件视频层盖住本窗口的一切界面（菜单/设置碎片都看不见），
+    // 但独立窗口（Dialog）能画在视频层之上（v26 探针实证）。
+    // 故网页频道播放时，OK/菜单键改为弹出这个非焦点对话框当频道菜单：
+    // 窗口不抢焦点，按键仍走 Activity 的 onKey，由这里维护选中项。
+    private data class WebMenuRow(
+        val kind: Int,
+        val groupIdx: Int,
+        val posInGroup: Int,
+        val title: String
+    )
 
-    private fun showProbeDialog() {
-        if (probeDialog?.isShowing == true) {
-            probeDialog?.dismiss()
-            probeDialog = null
-            return
-        }
-        val tv = TextView(this)
-        tv.text = "对话框探针：看到这块蓝板 = 独立窗口能盖住视频"
-        tv.setTextColor(Color.WHITE)
-        tv.textSize = 26f
-        tv.setBackgroundColor(Color.BLUE)
-        tv.setPadding(60, 60, 60, 60)
-        val d = Dialog(this)
-        d.setContentView(tv)
-        d.setCancelable(false)
-        probeDialog = d
-        d.show()
-    }
+    private var webMenuDialog: Dialog? = null
+    private var webMenuList: ListView? = null
+    private var webMenuRows: List<WebMenuRow> = emptyList()
+    private var webMenuSel: Int = -1
+    private val webMenuAutoClose = Runnable { closeWebMenu() }
 
-    private fun showProbeOverlay() {
-        if (probeOverlay != null) {
-            removeProbeOverlay()
-            return
-        }
-        val wm = getSystemService(WINDOW_SERVICE) as WindowManager
-        val tv = TextView(this)
-        tv.text = "悬浮窗探针：看到这块绿板 = 悬浮窗能盖住视频"
-        tv.setTextColor(Color.WHITE)
-        tv.textSize = 26f
-        tv.setBackgroundColor(Color.rgb(0, 140, 0))
-        tv.setPadding(60, 60, 60, 60)
-        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        else
-            @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_SYSTEM_ALERT
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            type,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-            android.graphics.PixelFormat.TRANSLUCENT
-        )
-        params.gravity = Gravity.CENTER
-        try {
-            wm.addView(tv, params)
-            probeOverlay = tv
-        } catch (e: Exception) {
-            "悬浮窗失败:${e.javaClass.simpleName}".showToast()
-        }
-    }
+    private fun isWebMenuOpen(): Boolean = webMenuDialog?.isShowing == true
 
-    private fun removeProbeOverlay() {
-        probeOverlay?.let {
-            try {
-                (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it)
-            } catch (e: Exception) {
+    private fun buildWebMenuRows(): List<WebMenuRow> {
+        val rows = mutableListOf<WebMenuRow>()
+        val gm = viewModel.groupModel
+        val playingGroup = gm.positionPlayingValue
+        for ((gIdx, listModel) in gm.tvGroupValue.withIndex()) {
+            if (gIdx == 1) continue // 「全部」组与其它组重复，不列
+            val channels = listModel.tvList.value ?: emptyList()
+            if (channels.isEmpty()) continue
+            rows.add(WebMenuRow(0, gIdx, -1, listModel.getName()))
+            val playingPos = if (gIdx == playingGroup) listModel.positionPlayingValue else -1
+            for ((pos, tvModel) in channels.withIndex()) {
+                val prefix = if (pos == playingPos) "▶ " else ""
+                rows.add(WebMenuRow(1, gIdx, pos, prefix + tvModel.tv.title))
             }
         }
-        probeOverlay = null
+        rows.add(WebMenuRow(2, -1, -1, "打开设置（将停止播放）"))
+        return rows
     }
 
-    // 临时诊断（v23）：把分发入口与各界面的状态打成 Toast，一次看清卡点。
-    private fun fragState(f: Fragment): String =
-        if (!f.isAdded) "-" else if (f.isHidden) "藏" else "显"
+    private fun showWebMenu() {
+        if (isWebMenuOpen()) {
+            closeWebMenu()
+            return
+        }
+        val rows = buildWebMenuRows()
+        if (rows.none { it.kind == 1 }) {
+            R.string.channel_not_exist.showToast()
+            return
+        }
+        webMenuRows = rows
+        val gm = viewModel.groupModel
+        var sel = rows.indexOfFirst { it.kind == 1 && it.groupIdx == gm.positionPlayingValue }
+        if (sel == -1) sel = rows.indexOfFirst { it.kind == 1 }
+        val playingPos = gm.getCurrentList()?.positionPlayingValue ?: -1
+        val exact = rows.indexOfFirst {
+            it.kind == 1 && it.groupIdx == gm.positionPlayingValue && it.posInGroup == playingPos
+        }
+        if (exact != -1) sel = exact
+        webMenuSel = sel
+
+        val listView = ListView(this)
+        listView.adapter = object : BaseAdapter() {
+            override fun getCount(): Int = webMenuRows.size
+            override fun getItem(position: Int): Any = webMenuRows[position]
+            override fun getItemId(position: Int): Long = position.toLong()
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
+                val tv = (convertView as? TextView) ?: TextView(this@MainActivity)
+                val row = webMenuRows[position]
+                tv.text = row.title
+                tv.setPadding(36, if (row.kind == 0) 14 else 20, 24, if (row.kind == 0) 8 else 20)
+                when (row.kind) {
+                    0 -> {
+                        tv.setTextColor(Color.rgb(170, 170, 170))
+                        tv.textSize = 15f
+                        tv.setBackgroundColor(Color.TRANSPARENT)
+                    }
+                    2 -> {
+                        tv.setTextColor(Color.rgb(255, 213, 120))
+                        tv.textSize = 18f
+                        tv.setBackgroundColor(
+                            if (position == webMenuSel) Color.rgb(90, 70, 0) else Color.TRANSPARENT
+                        )
+                    }
+                    else -> {
+                        tv.setTextColor(Color.WHITE)
+                        tv.textSize = 19f
+                        tv.setBackgroundColor(
+                            if (position == webMenuSel) Color.rgb(21, 101, 192) else Color.TRANSPARENT
+                        )
+                    }
+                }
+                return tv
+            }
+        }
+        listView.divider = null
+        listView.setBackgroundColor(Color.argb(235, 18, 18, 18))
+
+        val d = Dialog(this)
+        d.setContentView(listView)
+        d.setCancelable(false)
+        d.window?.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
+        d.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        webMenuDialog = d
+        webMenuList = listView
+        d.show()
+        val dm = resources.displayMetrics
+        d.window?.setLayout((dm.widthPixels * 0.30).toInt(), (dm.heightPixels * 0.86).toInt())
+        d.window?.setGravity(Gravity.START or Gravity.CENTER_VERTICAL)
+        listView.setSelection(webMenuSel)
+        armWebMenuAutoClose()
+    }
+
+    private fun armWebMenuAutoClose() {
+        handler.removeCallbacks(webMenuAutoClose)
+        handler.postDelayed(webMenuAutoClose, 15 * 1000L)
+    }
+
+    private fun refreshWebMenu() {
+        (webMenuList?.adapter as? BaseAdapter)?.notifyDataSetChanged()
+        webMenuList?.setSelection(webMenuSel)
+        armWebMenuAutoClose()
+    }
+
+    private fun moveWebMenu(delta: Int) {
+        val selectable = webMenuRows.indices.filter { webMenuRows[it].kind != 0 }
+        if (selectable.isEmpty()) return
+        var cur = selectable.indexOf(webMenuSel)
+        cur = if (cur == -1) 0 else (cur + delta + selectable.size) % selectable.size
+        webMenuSel = selectable[cur]
+        refreshWebMenu()
+    }
+
+    private fun activateWebMenuRow() {
+        val row = webMenuRows.getOrNull(webMenuSel) ?: return
+        when (row.kind) {
+            1 -> {
+                val gm = viewModel.groupModel
+                gm.setPosition(row.groupIdx)
+                gm.setPositionPlaying()
+                gm.getCurrentList()?.let {
+                    it.setPosition(row.posInGroup)
+                    it.setPositionPlaying()
+                    it.getCurrent()?.setReady()
+                }
+                closeWebMenu()
+            }
+            2 -> {
+                closeWebMenu()
+                webFragment.stopPlayback()
+                showSetting()
+            }
+        }
+    }
+
+    private fun closeWebMenu() {
+        handler.removeCallbacks(webMenuAutoClose)
+        webMenuDialog?.dismiss()
+        webMenuDialog = null
+        webMenuList = null
+    }
+
+    private fun onWebMenuKey(keyCode: Int): Boolean {
+        when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_UP -> moveWebMenu(-1)
+            KeyEvent.KEYCODE_DPAD_DOWN -> moveWebMenu(1)
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> activateWebMenuRow()
+            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE,
+            KeyEvent.KEYCODE_MENU -> closeWebMenu()
+        }
+        return true
+    }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_DOWN && webFragment.isWebActive()) {
-            "分发 ${event.keyCode} 菜${fragState(menuFragment)} 设${fragState(settingFragment)} 节${fragState(programFragment)}".showToast()
-        }
         if (event.action == KeyEvent.ACTION_DOWN &&
             webFragment.isWebActive() &&
             (!menuFragment.isAdded || menuFragment.isHidden) &&
