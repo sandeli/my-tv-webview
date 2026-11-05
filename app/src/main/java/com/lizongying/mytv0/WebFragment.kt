@@ -264,6 +264,7 @@ class WebFragment : Fragment() {
         document.head.appendChild(st);
       }
       v.setAttribute('playsinline','');
+      try{ v.controls=false; v.removeAttribute('controls'); }catch(e){}
       try{ v.click(); }catch(e){}
       var p=v.play();
       if(p&&p.catch){
@@ -273,7 +274,28 @@ class WebFragment : Fragment() {
       }
     }catch(e){}
   }
+  function sweep(doc){
+    try{
+      var W=doc.defaultView;
+      if(!W){ return; }
+      var els=doc.querySelectorAll('div,ul,footer,section');
+      for(var i=0;i<els.length;i++){
+        var el=els[i];
+        try{
+          if(el.querySelector('video')){ continue; }
+          var r=el.getBoundingClientRect();
+          if(r.height>=18&&r.height<=120&&r.width>W.innerWidth*0.35&&r.bottom>W.innerHeight*0.85&&r.top>W.innerHeight*0.5){
+            var cs=W.getComputedStyle(el);
+            if(cs&&(cs.position==='fixed'||cs.position==='absolute')){
+              el.style.setProperty('display','none','important');
+            }
+          }
+        }catch(e){}
+      }
+    }catch(e){}
+  }
   function scan(){
+    sweep(document);
     var vs=document.querySelectorAll('video');
     for(var i=0;i<vs.length;i++){ fit(vs[i]); }
     var frs=document.querySelectorAll('iframe');
@@ -281,6 +303,7 @@ class WebFragment : Fragment() {
       try{
         var d=frs[j].contentDocument;
         if(d){
+          sweep(d);
           var ivs=d.querySelectorAll('video');
           for(var k=0;k<ivs.length;k++){ fit(ivs[k]); }
         }
@@ -296,6 +319,7 @@ class WebFragment : Fragment() {
   var n=0;
   var timer=setInterval(function(){
     n++;
+    sweep(document);
     var vs=document.querySelectorAll('video');
     for(var i=0;i<vs.length;i++){ if(vs[i].paused){ fit(vs[i]); } }
     if(n>=10){ clearInterval(timer); }

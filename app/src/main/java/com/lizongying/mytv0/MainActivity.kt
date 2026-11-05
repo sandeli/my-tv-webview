@@ -1003,7 +1003,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         listView.divider = null
-        listView.setBackgroundColor(Color.argb(235, 18, 18, 18))
+        listView.setBackgroundColor(Color.argb(165, 48, 48, 54))
 
         val d = Dialog(this)
         d.setContentView(listView)
