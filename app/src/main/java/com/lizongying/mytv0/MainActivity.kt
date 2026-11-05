@@ -568,6 +568,13 @@ class MainActivity : AppCompatActivity() {
         if (fragment === menuFragment || fragment === settingFragment || fragment === programFragment) {
             webFragment.softShow()
         }
+
+        if (fragment === settingFragment && suppressAutoPlay) {
+            suppressAutoPlay = false
+            // 「重启进设置」的会话：关设置后自动续播刚才的频道，
+            // 不用再打开菜单手动选台。
+            viewModel.groupModel.getCurrent()?.setReady()
+        }
     }
 
     fun menuActive() {
