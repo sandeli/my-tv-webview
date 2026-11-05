@@ -260,8 +260,7 @@ class WebFragment : Fragment() {
         document.head.appendChild(st);
       }
       v.setAttribute('playsinline','');
-      try{ v.controls=false; v.removeAttribute('controls'); }catch(e){}
-      if(!v.__webtvClicked){ v.__webtvClicked=true; try{ v.click(); }catch(e){} }
+      try{ v.click(); }catch(e){}
       var p=v.play();
       if(p&&p.catch){
         p.catch(function(){
