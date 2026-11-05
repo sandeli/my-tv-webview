@@ -115,24 +115,10 @@ class WebFragment : Fragment() {
             }
 
             override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
-                if (view == null) {
-                    return
-                }
-                if (customView != null) {
-                    onHideCustomView()
-                }
-                customView = view
-                customViewCallback = callback
-                view.setOnKeyListener { _, keyCode, event -> forwardKey(keyCode, event) }
-                binding.fullscreenContainer.addView(
-                    view,
-                    ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                )
-                binding.fullscreenContainer.visibility = View.VISIBLE
-                binding.webView.visibility = View.GONE
+                // 不进 HTML5 全屏：全屏视图自带系统暂停/播放底栏（关不掉），
+                // 且脱离页面后注入的全屏样式也管不到它。
+                // 拒绝后播放器留在页内，由注入样式把 video 拉满全屏，效果相同且无底栏。
+                callback?.onCustomViewHidden()
             }
 
             override fun onHideCustomView() {
@@ -273,7 +259,7 @@ class WebFragment : Fragment() {
       if(!document.getElementById('__webtv_style')){
         var st=document.createElement('style');
         st.id='__webtv_style';
-        st.innerHTML='html,body{width:100%!important;height:100%!important;background:#000!important;overflow:hidden!important}video{position:fixed!important;left:0!important;top:0!important;width:100%!important;height:100%!important;z-index:2147483647!important;background:#000!important;object-fit:contain!important}video::-webkit-media-controls,video::-webkit-media-controls-panel,video::-webkit-media-controls-play-button,video::-webkit-media-controls-start-playback-button,video::-webkit-media-controls-timeline,video::-webkit-media-controls-current-time-display,video::-webkit-media-controls-time-remaining-display,video::-webkit-media-controls-seek-back-button,video::-webkit-media-controls-seek-forward-button,video::-webkit-media-controls-fullscreen-button{display:none!important;-webkit-appearance:none!important}.jw-controlbar{display:none!important}';
+        st.innerHTML='html,body{width:100%!important;height:100%!important;background:#000!important;overflow:hidden!important}video{position:fixed!important;left:0!important;top:0!important;width:100%!important;height:100%!important;z-index:2147483647!important;background:#000!important;object-fit:contain!important}video::-webkit-media-controls,video::-webkit-media-controls-panel,video::-webkit-media-controls-play-button,video::-webkit-media-controls-start-playback-button,video::-webkit-media-controls-timeline,video::-webkit-media-controls-current-time-display,video::-webkit-media-controls-time-remaining-display,video::-webkit-media-controls-seek-back-button,video::-webkit-media-controls-seek-forward-button,video::-webkit-media-controls-fullscreen-button{display:none!important;-webkit-appearance:none!important}.jw-controlbar{display:none!important}.jw-controls{display:none!important}';
         document.head.appendChild(st);
       }
       v.setAttribute('playsinline','');
